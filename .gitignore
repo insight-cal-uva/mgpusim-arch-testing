@@ -2,6 +2,9 @@
 MNIST
 model
 *.csv
+*.hsaco
+*.disasm
+launch/launch
 
 ## Standard C++ .gitignore ##
 

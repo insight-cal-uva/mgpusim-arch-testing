@@ -22,20 +22,24 @@ import (
 // __global__ void calculate_neuron(int count, float *prev, int prev_dim, float* next, int next_dim, float* weights, float* bias, int activation){
 
 // KernelArgs defines kernel arguments
-type KernelArgs struct {
+type KernelArgs struct { 
 	Count 			 int32
+	Pad 			 int32
 	Prev 			 driver.Ptr
 	PrevDim 		 int32
+	Pad1 			 int32
 	Next 			 driver.Ptr
 	NextDim 		 int32
+	Pad2 			 int32
 	Weights 		 driver.Ptr
 	Bias 			 driver.Ptr
 	Activation 		 int32
+	Pad3 			 int32
 	// Padding		       int32 // padding to align to 8 bytes
 	HiddenGlobalOffsetX int64
 	HiddenGlobalOffsetY int64
 	HiddenGlobalOffsetZ int64
-}
+} // note: according to https://github.com/sarchlab/mgpusim/blob/v3/doc/prepare_benchmarks.md#run-a-kernel the padding is only to be to 8 bytes, so none is needed here
 
 
 // Benchmark defines a benchmark
@@ -127,7 +131,7 @@ func (b *Benchmark) initMem() {
 
 	// len_mnist := 28 * 28 * b.numExamples
 	// len_model := (28 * 28) * 128 + 128 + (128 * 64) + 64 + (64 * 10) + 10 + 128 + 64 + 10
-	len_tmp := 28 * 28 * b.numExamples * 128 * 64
+	len_tmp := 28 * 28 * b.numExamples
 
 	b.gMnistData = b.driver.AllocateMemory(b.context, uint64(len(b.mnistData) * 4 + 128))
 	b.gModelData = b.driver.AllocateMemory(b.context, uint64(len(b.modelData) * 4 + 128))
@@ -163,28 +167,35 @@ func (b *Benchmark) exec() {
 
 		log.Printf("Entered the first command queue\n")
 
+		// logging out each pointer
+		log.Printf("gMnistData: %v\n", b.gMnistData)
+		log.Printf("gModelData: %v\n", b.gModelData)
+		log.Printf("gTmpData: %v\n", b.gTmpData)
+		log.Printf("gTmpData2: %v\n", b.gTmpData2)
+
 		// first layer
 		args := KernelArgs{
 			int32(b.numExamples),
+			-1, // padding
 			b.gMnistData,
 			1,
+			-1, // padding
 			b.gTmpData,
 			1,
+			-1, // padding
 			b.gModelData,
 			b.gTmpData2,
 			1,
-			0,
-			0, 
-			0,
-			0,
+			-1, // padding
+			0, 0, 0,
 		}
 
 		b.driver.EnqueueLaunchKernel(
 			queues[i],
 			b.hsaco,
 			// [3]uint32{blocksPerGrid(b.numExamples * 128), 1, 1},
-			[3]uint32{5, 1, 1},
-			[3]uint16{threadsPerBlock, 1, 1}, &args,
+			[3]uint32{1, 1, 1},
+			[3]uint16{1, 1, 1}, &args,
 		)
 
 		log.Printf("First layer done\n")
@@ -192,14 +203,17 @@ func (b *Benchmark) exec() {
 		// second layer
 		args = KernelArgs{
 			int32(b.numExamples),
+			-1, // padding
 			b.gMnistData,
 			1,
+			-1, // padding
 			b.gTmpData,
 			1,
+			-1, // padding
 			b.gModelData,
 			b.gModelData,
 			1,
-			0,
+			-1, // padding
 			0, 0, 0,
 		}
 
@@ -216,14 +230,17 @@ func (b *Benchmark) exec() {
 		// last layer
 		args = KernelArgs{
 			int32(b.numExamples),
+			-1, // padding
 			b.gMnistData,
 			1,
+			-1, // padding
 			b.gTmpData,
 			1,
+			-1, // padding
 			b.gModelData,
 			b.gModelData,
 			0,
-			0,
+			-1, // padding
 		 	0, 0, 0,
 		}
 
@@ -247,6 +264,6 @@ func (b *Benchmark) exec() {
 
 // Verify verifies
 func (b *Benchmark) Verify() {
-        // no verfication, we are going to leave that as a stub
+    // no verfication, we are going to leave that as a stub
 	log.Printf("Passed!\n")
 }

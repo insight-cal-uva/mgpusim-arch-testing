@@ -24,6 +24,22 @@ The neural network uses will be a basic feed-forward neural network with use of 
 
 The project uses a common Makefile for **all** implementations of the neural network for ease of interaction.
 
+## Building the Open CL Kernels
+
+The OpenCl kernels are compiled into the kernel bytecode for NVIDIA using RocM 3.8 through a dockerfile. To build a kernel, run:
+
+```bash
+docker build -t rocm-cl-compiler .
+```
+
+To build the container and then use:
+
+```bash
+docker run --rm -v $(pwd):/workspace rocm-cl-compiler
+```
+
+To build `kernels.cl` to `kernels.hsaco`. At this point, you should be done! The compiled kernels are in the correct format to work with `v3` of mgpusim. 
+
 ## Performance Considerations
 
 For this project, there are a few main performance considerations:

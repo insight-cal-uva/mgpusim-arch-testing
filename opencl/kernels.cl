@@ -2,6 +2,7 @@
 
 __kernel void calculate_neuron(int count, __global float *prev, int prev_dim, __global float* next, int next_dim, __global float* weights, __global float* bias, int activation){
     int idx = get_global_id(0);
+
     if(idx >= next_dim * count) return; // too far
 
     int next_index = idx % next_dim;

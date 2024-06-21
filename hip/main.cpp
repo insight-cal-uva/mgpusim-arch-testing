@@ -126,6 +126,7 @@ int main(int argc, char* argv[]){
                 close(fd);
         }
 
+// hipMalloc -> cudaMalloc
         ck(hipMalloc((void **) &gpu_model, model_size));
         ck(hipMemcpy(gpu_model, model, model_size, hipMemcpyHostToDevice));
         fprintf(stderr, "Model loaded with data on the GPU\n");

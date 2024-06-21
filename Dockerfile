@@ -1,14 +1,19 @@
 # Use ROCm base image
-FROM rocm/dev-ubuntu-22.04:5.4-complete
+FROM rocm/dev-ubuntu-18.04:3.8
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install necessary packages
-RUN apt-get update && apt-get install -y \
-    cmake \
-    build-essential \
-    rocm-opencl \
+# RUN apt-get update 
+
+# installing build tools
+# RUN apt-get install -y \
+#     cmake \
+#     build-essential
+
+RUN apt-get install -y \
+    rocm-dev \
     rocm-opencl-dev \
     rocm-clang-ocl
 
@@ -16,7 +21,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /workspace
 
 # Copy the OpenCL kernel file into the container
-COPY kernel.cl .
+COPY ./nnet/kernels.cl .
 
-# Command to compile the .cl file into .hsaco
-CMD ["clang-ocl", "-mcpu=fiji", "-o", "kernels.hsaco", "kernels.cl"]
+# Run the bash script (apparently Docker does not like more than one command)
+CMD ["/bin/bash", "./nnet/create-files.sh"]

@@ -1,4 +1,4 @@
-.PHONY: clean train cuda-eval hip-eval
+.PHONY: clean train cuda-eval hip-eval build-hsaco
 
 CC = nvcc
 CFLAGS = 
@@ -15,6 +15,9 @@ cuda-eval: model cuda/a.out
 
 hip-eval: hip/a.out
 	./hip/a.out
+
+build-hsaco: 
+	docker run --rm -v $(pwd):/workspace rocm-cl-compiler
 
 opencl-eval: opencl/kernels.hsaco
 
