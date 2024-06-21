@@ -52,7 +52,7 @@ type Benchmark struct {
 	gpus    []int
 
 	// parameters
-	numExamples int // adjust this for cache locality differences
+	numExamples int64 // adjust this for cache locality differences
 	
 	// input data on host
 	modelData []float32
@@ -152,7 +152,7 @@ func (b *Benchmark) exec() {
 	// make threadsPerBlock a uint16
 	threadsPerBlock := uint16(16) 
 
-	blocksPerGrid := func(n int) uint32 {
+	blocksPerGrid := func(n int64) uint32 {
 		return uint32(math.Ceil(float64(n) / float64(threadsPerBlock)))
 	}
 
@@ -178,13 +178,13 @@ func (b *Benchmark) exec() {
 			int32(b.numExamples),
 			-1, // padding
 			b.gMnistData,
-			1,
+			28 * 28,
 			-1, // padding
 			b.gTmpData,
-			1,
+			128,
 			-1, // padding
 			b.gModelData,
-			b.gTmpData2,
+			b.gModelData + 128 * 28 * 28 * 4, // 4 is the size of a float32
 			1,
 			-1, // padding
 			0, 0, 0,
@@ -204,13 +204,13 @@ func (b *Benchmark) exec() {
 			int32(b.numExamples),
 			-1, // padding
 			b.gMnistData,
-			1,
+			128, // previous dimension
 			-1, // padding
-			b.gTmpData,
-			1,
+			b.gTmpData + 128 * 10 * 4, // previous data
+			64,
 			-1, // padding
-			b.gModelData,
-			b.gModelData,
+			b.gModelData + (28 * 28 * 128 + 128) * 4,
+			b.gModelData + (28 * 28 * 128 + 128 + 128 * 64) * 4,
 			1,
 			-1, // padding
 			0, 0, 0,
@@ -230,14 +230,14 @@ func (b *Benchmark) exec() {
 			int32(b.numExamples),
 			-1, // padding
 			b.gMnistData,
-			1,
+			64, // previous dimension
 			-1, // padding
 			b.gTmpData,
-			1,
+			10, // next dimension
 			-1, // padding
-			b.gModelData,
-			b.gModelData,
-			0,
+			b.gModelData + (28 * 28 * 128 + 128 + 128 * 64 + 64) * 4,
+			b.gModelData + (28 * 28 * 128 + 128 + 128 * 64 + 64 + 64 * 10) * 4,
+			0, // no activation
 			-1, // padding
 		 	0, 0, 0,
 		}
