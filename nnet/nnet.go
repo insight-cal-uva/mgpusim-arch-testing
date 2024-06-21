@@ -193,9 +193,8 @@ func (b *Benchmark) exec() {
 		b.driver.EnqueueLaunchKernel(
 			queues[i],
 			b.hsaco,
-			// [3]uint32{blocksPerGrid(b.numExamples * 128), 1, 1},
-			[3]uint32{1, 1, 1},
-			[3]uint16{1, 1, 1}, &args,
+			[3]uint32{blocksPerGrid(b.numExamples * 128), 1, 1},
+			[3]uint16{threadsPerBlock, 1, 1}, &args,
 		)
 
 		log.Printf("First layer done\n")
@@ -220,8 +219,7 @@ func (b *Benchmark) exec() {
 		b.driver.EnqueueLaunchKernel(
 			queues[i],
 			b.hsaco,
-			// [3]uint32{blocksPerGrid(b.numExamples * 64), 1, 1},
-			[3]uint32{5, 1, 1},
+			[3]uint32{blocksPerGrid(b.numExamples * 64), 1, 1},
 			[3]uint16{threadsPerBlock, 1, 1}, &args,
 		)
 
@@ -247,8 +245,7 @@ func (b *Benchmark) exec() {
 		b.driver.EnqueueLaunchKernel(
 			queues[i],
 			b.hsaco,
-			// [3]uint32{blocksPerGrid(b.numExamples * 10), 1, 1},
- 			[3]uint32{5, 1, 1},
+			[3]uint32{blocksPerGrid(b.numExamples * 10), 1, 1},
 			[3]uint16{threadsPerBlock, 1, 1}, &args,
 		)
 
