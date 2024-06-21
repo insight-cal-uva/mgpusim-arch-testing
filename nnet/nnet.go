@@ -206,7 +206,7 @@ func (b *Benchmark) exec() {
 			b.gMnistData,
 			128, // previous dimension
 			-1, // padding
-			b.gTmpData + 128 * 10 * 4, // previous data
+			b.gTmpData + driver.Ptr(128 * b.numExamples * 4), // previous data
 			64,
 			-1, // padding
 			b.gModelData + (28 * 28 * 128 + 128) * 4,
@@ -232,7 +232,7 @@ func (b *Benchmark) exec() {
 			b.gMnistData,
 			64, // previous dimension
 			-1, // padding
-			b.gTmpData,
+			b.gTmpData + driver.Ptr(128 * b.numExamples * 4 + 64 * b.numExamples * 4), // previous data
 			10, // next dimension
 			-1, // padding
 			b.gModelData + (28 * 28 * 128 + 128 + 128 * 64 + 64) * 4,
