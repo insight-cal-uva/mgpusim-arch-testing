@@ -194,7 +194,10 @@ int main(int argc, char *argv[]) {
         // compare the results to 0.0001
         int correct = 0;
         for(int j=0; j < i * 10; j++) {
-            if (results[j] - mnist_outputs[j] < 0.0001 || mnist_outputs[j] - results[j] < 0.0001) {
+            float diff = results[j] - mnist_outputs[j];
+            diff = diff > 0 ? diff : -diff;
+
+            if (diff < 0.0001) {
                 correct++;
             }
         }
