@@ -150,7 +150,7 @@ int main(int argc, char *argv[]) {
     // Loading the ground truth labels
     int mnist_outputs_fd = open("sample_outputs.bin", NULL);
     if (mnist_outputs_fd < 0) {
-        fprintf(stderr, "Error openining train labels... \n");
+        fprintf(stderr, "Error openining sample outputs... \n");
         exit(1);
     }
 
@@ -201,7 +201,7 @@ int main(int argc, char *argv[]) {
                 correct++;
             }
         }
-        // print the correct as a percentage
+        // print the number correct as a percentage
         fprintf(stderr, "Correct: %f\n", (float)correct / (i * 10));
 
         free(results);

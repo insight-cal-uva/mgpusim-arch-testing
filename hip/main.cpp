@@ -117,7 +117,7 @@ int main(int argc, char* argv[]){
         float *model;
         float *gpu_model;
 
-        ck(hipHostMalloc(&model, model_size, hipHostMallocDefault));        
+        ck(hipHostMalloc(&model, model_size, NULL));        
 
         if(model_size != read(fd, model, model_size)){
                 fprintf(stderr, "Did not read enough bytes, exiting...\n");
@@ -126,7 +126,7 @@ int main(int argc, char* argv[]){
                 close(fd);
         }
 
-// hipMalloc -> cudaMalloc
+        // hipMalloc -> cudaMalloc
         ck(hipMalloc((void **) &gpu_model, model_size));
         ck(hipMemcpy(gpu_model, model, model_size, hipMemcpyHostToDevice));
         fprintf(stderr, "Model loaded with data on the GPU\n");
@@ -154,6 +154,24 @@ int main(int argc, char* argv[]){
         ck(hipMalloc((void **) &gpu_mnist, mnist_size));
         ck(hipMemcpy(gpu_mnist, mnist, mnist_size, hipMemcpyHostToDevice));
         
+        // Loading the ground truth outputs
+        int mnist_outputs_fd = open("sample_outputs.bin", NULL);
+        if(mnist_outputs_fd < 0){
+          fprintf(stderr, "Error opening sample outputs... \n");
+          exit(1);
+        }
+
+        float *mnist_outputs;
+
+        int mnist_outputs_size = 10 * sizeof(float) * num_mnist_images;
+
+        ck(hipHostMalloc(&mnist_outputs, mnist_outputs_size)); 
+
+        if(0 != read(mnist_outputs_fd, mnist_outputs, mnist_outputs_size)){
+                fprintf(stderr, "Did not read enough mnist outputs, exiting...\n");
+                exit(1);
+        }
+
         // Evaluating performance
         int max_samples = 10000;
         int step = 2;
@@ -171,6 +189,22 @@ int main(int argc, char* argv[]){
                 feed_forward(gpu_model, gpu_mnist, tmp, i, 0);
 
                 clock_gettime(CLOCK_MONOTONIC, &end);
+
+                // get the data from the gpu
+                float *results = (float *) malloc(10 * sizeof(float) * i);
+                ck(hipMemcpy(results, tmp + (128 + 64) * i * sizeof(float), 10 * i * sizeof(float), hipMemcpyDeviceToHost));
+
+                int correct = 0;
+                for(int j = 0; j < i * 10; j++){
+                        float diff = results[j] - mnist_outputs[j];
+                        diff = diff < 0 ? -diff : diff;
+                        if(diff < 0.0001) correct++;
+                }
+                
+                // print the number correct as a percentage
+                fprintf(stderr, "Correct: %f\n", (float)correct / (i * 10));
+
+                free(results);
 
                 // elapsed nanoseconds
                 long long elapsed_ns = (end.tv_sec - start.tv_sec) * 1000000000LL + (end.tv_nsec - start.tv_nsec);
