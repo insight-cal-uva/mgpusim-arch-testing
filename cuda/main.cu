@@ -147,6 +147,24 @@ int main(int argc, char *argv[]) {
     ck(cudaMalloc((void **)&gpu_mnist, mnist_size));
     ck(cudaMemcpy(gpu_mnist, mnist, mnist_size, cudaMemcpyHostToDevice));
 
+    // Loading the ground truth labels
+    int mnist_outputs_fd = open("sample_outputs.bin", NULL);
+    if (mnist_outputs_fd < 0) {
+        fprintf(stderr, "Error openining train labels... \n");
+        exit(1);
+    }
+
+    float *mnist_outputs;
+
+    int mnist_labels_size = 10 * sizeof(float) * num_mnist_images;
+
+    ck(cudaMallocHost(&mnist_outputs, mnist_labels_size));
+
+    if (0 != read(fd, mnist_outputs, mnist_labels_size)) {
+        fprintf(stderr, "Did not read enough mnist labels bytes, exiting...\n");
+        exit(1);
+    }
+
     // Evaluating performance
     int max_samples = 10000;
     int step = 2;
@@ -164,6 +182,26 @@ int main(int argc, char *argv[]) {
         feed_forward(gpu_model, gpu_mnist, tmp, i, 0);
 
         clock_gettime(CLOCK_MONOTONIC, &end);
+
+        // validation of results (copy from tmp and compare to mnist_outputs)
+
+        // results are in tmp + (128 + 64) * i * sizeof(float) for the last layer
+
+        // get the data from the gpu
+        float *results = (float *)malloc(10 * i * sizeof(float));
+        ck(cudaMemcpy(results, tmp + (128 + 64) * i * sizeof(float), 10 * i * sizeof(float), cudaMemcpyDeviceToHost));
+
+        // compare the results to 0.0001
+        int correct = 0;
+        for(int j=0; j < i * 10; j++) {
+            if (results[j] - mnist_outputs[j] < 0.0001 || mnist_outputs[j] - results[j] < 0.0001) {
+                correct++;
+            }
+        }
+        // print the correct as a percentage
+        fprintf(stderr, "Correct: %f\n", (float)correct / (i * 10));
+
+        free(results);
 
         // elapsed nanoseconds
         long long elapsed_ns = (end.tv_sec - start.tv_sec) * 1000000000LL + (end.tv_nsec - start.tv_nsec);
