@@ -14,3 +14,6 @@
 
 /opt/rocm/llvm/bin/llvm-objdump --mcpu=gfx803 --disassemble nnet/kernels-gfx803.hsaco > nnet/kernels-gfx803.disasm
 /opt/rocm/llvm/bin/llvm-objdump --mcpu=fiji --disassemble nnet/kernels-fiji.hsaco > nnet/kernels-fiji.disasm
+
+# use fiji
+cp nnet/kernels-fiji.hsaco nnet/kernels.hsaco

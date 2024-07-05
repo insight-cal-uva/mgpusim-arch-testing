@@ -10,7 +10,7 @@ __kernel void calculate_neuron(int count, __global float *prev, int prev_dim, __
     for(int i = 0; i < prev_dim; i++){
         // weights are a n x m matrix so when you flatten the ith row needs to be multiplied by next_dim and the jth column is the next_index
         float weight = weights[i * next_dim + next_index];
-        float prior_node = prev[prev_dim * idx / next_dim + i];
+        float prior_node = prev[prev_dim * (idx / next_dim) + i];
         total += weight * prior_node;
     }
 

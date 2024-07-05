@@ -62,7 +62,6 @@ type Benchmark struct {
 	gModelData driver.Ptr
 	gMnistData driver.Ptr
 	gTmpData   driver.Ptr
-	gTmpData2  driver.Ptr
 
 	// commonly used options ( we will not care about unified memory at first)
 	useUnifiedMemory bool
@@ -71,11 +70,14 @@ type Benchmark struct {
 //go:embed kernels.hsaco
 var hsacoBytes []byte
 
-//go:embed mnist_data.bin
+//go:embed mnist_train_images.bin
 var mnistDataBytes []byte
 
-//go:embed model_data.bin
+//go:embed model
 var modelDataBytes []byte
+
+//go:embed sample_outputs.bin
+var sampleOutputsBytes []byte
 
 // Helper function
 func bytesToFloat32(b []byte) []float32 {
@@ -123,43 +125,45 @@ func (b *Benchmark) Run() {
 }
 
 func (b *Benchmark) initMem() {
-    // todo: change init Mem to use the correct initilization scheme
+    // parse mnist and model data
 	b.mnistData = bytesToFloat32(mnistDataBytes)
 	b.modelData = bytesToFloat32(modelDataBytes)
 
 	b.numExamples = 10
 
-	// len_mnist := 28 * 28 * b.numExamples
-	// len_model := (28 * 28) * 128 + 128 + (128 * 64) + 64 + (64 * 10) + 10 + 128 + 64 + 10
-	len_tmp := 28 * 28 * b.numExamples
+	len_tmp := (128 + 64 + 10) * b.numExamples
 
-	b.gMnistData = b.driver.AllocateMemory(b.context, uint64(len(b.mnistData) * 4 + 128))
-	b.gModelData = b.driver.AllocateMemory(b.context, uint64(len(b.modelData) * 4 + 128))
+	b.gMnistData = b.driver.AllocateMemory(b.context, uint64(len(b.mnistData) * 4))
+	b.gModelData = b.driver.AllocateMemory(b.context, uint64(len(b.modelData) * 4))
 	b.gTmpData = b.driver.AllocateMemory(b.context, uint64(len_tmp*4))
-	b.gTmpData2 = b.driver.AllocateMemory(b.context, uint64(len_tmp*4))
 
 	b.driver.MemCopyH2D(b.context, b.gMnistData, b.mnistData)
 	b.driver.MemCopyH2D(b.context, b.gModelData, b.modelData)
 
-	// bogus memcopies into scratch space to avoid segfaults??
-	b.driver.MemCopyH2D(b.context, b.gTmpData, make([]float32, len_tmp))
-	b.driver.MemCopyH2D(b.context, b.gTmpData2, make([]float32, len_tmp))
+	// bogus memcopies into scratch space
+	scratch_space := make([]float32, len_tmp)
+
+	// fill scratch space with random data
+	for i := range scratch_space {
+		scratch_space[i] = -1000000.0
+	}
+
+	b.driver.MemCopyH2D(b.context, b.gTmpData, scratch_space)
 }
 
 func (b *Benchmark) exec() {
 	queues := make([]*driver.CommandQueue, len(b.gpus))
 
 	// make threadsPerBlock a uint16
-	threadsPerBlock := uint16(16) 
-
-	blocksPerGrid := func(n int64) uint32 {
-		return uint32(math.Ceil(float64(n) / float64(threadsPerBlock)))
+	threadsPerBlock := uint16(256)
+	blocksPerGrid := func (numExamples int64) uint32 {
+		// return uint32((numExamples + int64(threadsPerBlock) - 1) / int64(threadsPerBlock))
+		return uint32((10 * numExamples))
 	}
 
 	// log the number of examples
 	log.Printf("Number of examples: %d\n", b.numExamples)
 	log.Printf("Number of gpus: %d\n", len(b.gpus))
-	log.Printf("Blocks per Grid %d\n", blocksPerGrid(b.numExamples))
 
 	for i, gpu := range b.gpus {
 		b.driver.SelectGPU(b.context, gpu)
@@ -171,22 +175,21 @@ func (b *Benchmark) exec() {
 		log.Printf("gMnistData: %v\n", b.gMnistData)
 		log.Printf("gModelData: %v\n", b.gModelData)
 		log.Printf("gTmpData: %v\n", b.gTmpData)
-		log.Printf("gTmpData2: %v\n", b.gTmpData2)
 
 		// first layer
 		args := KernelArgs{
 			int32(b.numExamples),
-			-1, // padding
+			int32(-1), // padding
 			b.gMnistData,
-			28 * 28,
-			-1, // padding
+			int32(28 * 28),
+			int32(-1), // padding
 			b.gTmpData,
-			128,
-			-1, // padding
+			int32(128),
+			int32(-1), // padding
 			b.gModelData,
-			b.gModelData + 128 * 28 * 28 * 4, // 4 is the size of a float32
-			1,
-			-1, // padding
+			b.gModelData + driver.Ptr((128 * 28 * 28) * 4), // 4 is the size of a float32
+			int32(1),
+			int32(-1), // padding
 			0, 0, 0,
 		}
 
@@ -203,14 +206,14 @@ func (b *Benchmark) exec() {
 		args = KernelArgs{
 			int32(b.numExamples),
 			-1, // padding
-			b.gMnistData,
+			b.gTmpData, // previous data
 			128, // previous dimension
 			-1, // padding
 			b.gTmpData + driver.Ptr(128 * b.numExamples * 4), // previous data
 			64,
 			-1, // padding
-			b.gModelData + (28 * 28 * 128 + 128) * 4,
-			b.gModelData + (28 * 28 * 128 + 128 + 128 * 64) * 4,
+			b.gModelData + driver.Ptr(((28 * 28) * 128 + 128) * 4),
+			b.gModelData + driver.Ptr(((28 * 28) * 128 + 128 + 128 * 64) * 4),
 			1,
 			-1, // padding
 			0, 0, 0,
@@ -229,14 +232,14 @@ func (b *Benchmark) exec() {
 		args = KernelArgs{
 			int32(b.numExamples),
 			-1, // padding
-			b.gMnistData,
+			b.gTmpData + driver.Ptr(128 * b.numExamples * 4), // previous data
 			64, // previous dimension
 			-1, // padding
-			b.gTmpData + driver.Ptr(128 * b.numExamples * 4 + 64 * b.numExamples * 4), // previous data
+			b.gTmpData + driver.Ptr((128 + 64) * b.numExamples * 4), // previous data
 			10, // next dimension
 			-1, // padding
-			b.gModelData + (28 * 28 * 128 + 128 + 128 * 64 + 64) * 4,
-			b.gModelData + (28 * 28 * 128 + 128 + 128 * 64 + 64 + 64 * 10) * 4,
+			b.gModelData + driver.Ptr(((28 * 28) * 128 + 128 + 128 * 64 + 64) * 4),
+			b.gModelData + driver.Ptr(((28 * 28) * 128 + 128 + 128 * 64 + 64 + 64 * 10) * 4),
 			0, // no activation
 			-1, // padding
 		 	0, 0, 0,
@@ -261,6 +264,22 @@ func (b *Benchmark) exec() {
 
 // Verify verifies
 func (b *Benchmark) Verify() {
-    // no verfication, we are going to leave that as a stub
+	// copy the data back
+	data_offset := (128 + 64) * b.numExamples // 4 is the size of a float32
+
+	// copy the gTmpData back use 
+	tmpData := make([]float32, (128 + 64 + 10) * b.numExamples)
+	b.driver.MemCopyD2H(b.context, tmpData, b.gTmpData)
+
+	// parse the sample outputs as a float32 array
+	sampleOutputs := bytesToFloat32(sampleOutputsBytes)
+
+	// compare the outputs
+	for i := int64(0); i < b.numExamples * 10; i++ {
+		if math.Abs(float64(tmpData[i + data_offset] - sampleOutputs[i])) > 0.0001 {
+			log.Printf("Failed at %d: %f != %f\n", i, tmpData[i + data_offset], sampleOutputs[i])
+		}
+	}
+    
 	log.Printf("Passed!\n")
 }
